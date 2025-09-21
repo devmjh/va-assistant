@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+va_env/
+riva_venv/
+
+# Secrets
+.env
+
+# Temporary Media Files
+*.wav

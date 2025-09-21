@@ -1,0 +1,20 @@
+// Use protobuf version 3 syntax
+syntax = "proto3";
+
+// The message format for a single chunk of audio data
+message Chunk {
+  bytes audio_chunk = 1;
+}
+
+// The message format for the server's response after the stream is complete
+message StreamReceipt {
+  string status_message = 1;
+}
+
+// The definition of our AudioStreamer service
+service AudioStreamer {
+  // A client-streaming RPC.
+  // The client (Raspberry Pi) sends a stream of audio Chunks.
+  // The server (Jetson) sends back a single StreamReceipt when it's done.
+  rpc StreamAudio(stream Chunk) returns (StreamReceipt) {}
+}
