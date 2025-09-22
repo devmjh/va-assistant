@@ -64,3 +64,39 @@ The system requires starting three processes in separate terminals:
 2.  **ACU (on the Raspberry Pi):** Start the `listener_client.py` script. This will begin listening for the wake word.
 3.  *(Optional) Other Services:* Start any other required services, like the Ollama server.
 
+# AI Voice Assistant for the Home Lab 🤖
+
+## Overview
+
+This project is a distributed, on-device AI voice assistant. It uses a modular, client-server architecture to separate audio capture from AI processing, resulting in a robust and scalable system.
+
+## Architecture
+
+The system uses two devices that communicate over the local network using gRPC.
+
+### 1. The Audio Capture Unit (ACU)
+* **Hardware:** A Raspberry Pi with a USB microphone.
+* **Script:** `acu_pi/listener_client.py`
+* **Role:** Listens for the wake word using PocketSphinx, records the user's command, and streams the audio in real-time to the AI Brain.
+
+### 2. The AI Brain
+* **Hardware:** An NVIDIA Jetson Orin Nano with speakers.
+* **Script:** `brain_jetson/handler_server.py`
+* **Role:** Acts as a gRPC server. It receives audio from the ACU, transcribes it using Vosk, parses intent, and generates responses using local skills (system commands, MySQL) or LLMs (local Ollama, remote OpenAI API).
+
+---
+
+## How to Run the System
+
+The system requires starting two scripts in separate terminals. The Ollama service should also be running if you intend to use the local LLM.
+
+### Terminal 1: On the AI Brain (Jetson Nano)
+```bash
+# Navigate to the project directory
+cd ~/va-assistant
+
+# Activate the environment
+source va_env/bin/activate
+
+# Run the server
+python brain_jetson/handler_server.py
