@@ -7,6 +7,7 @@ import numpy as np
 import collections
 import sys
 import os
+import pocketsphinx
 
 # --- Add protos directory to path ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -30,12 +31,15 @@ def main():
        to switch between wake-word detection and command streaming."""
     
     # --- Initialize PocketSphinx Decoder ---
-    # This setup is more manual but gives us control over the audio chunks
-    config = Decoder.default_config()
-    config.set_string('-hmm', '/usr/local/share/pocketsphinx/model/en-us/en-us')
-    config.set_string('-dict', '/usr/local/share/pocketsphinx/model/en-us/cmudict-en-us.dict')
+    # This setup creates a clean configuration for only keyword spotting
+    # and finds the model path automatically.
+    model_path = pocketsphinx.get_model_path()
+    config = Decoder.Config()
+    config.set_string('-hmm', os.path.join(model_path, 'en-us'))
+    config.set_string('-dict', os.path.join(model_path, 'cmudict-en-us.dict'))
     config.set_string('-keyphrase', WAKE_WORD)
     config.set_float('-kws_threshold', 1e-20)
+    config.set_string('-logfn', '/dev/null') # Suppress log file spam
     decoder = Decoder(config)
 
     # --- Initialize VAD ---
