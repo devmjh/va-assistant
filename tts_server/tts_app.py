@@ -1,5 +1,6 @@
 # filename: tts_server/tts_app.py
 import os
+import traceback
 from flask import Flask, request, send_file, jsonify
 from TTS.api import TTS
 import torch
@@ -14,7 +15,6 @@ OUTPUT_FILENAME = "output.wav"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"TTS running on device: {device}")
 
-# Upgraded to the high-quality XTTS v2 model
 model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
 logging.info(f"Loading TTS model: {model_name}...")
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
@@ -30,15 +30,15 @@ def generate_speech():
     logging.info(f"Received request to synthesize: '{text_to_speak}'")
 
     try:
-        # BUG FIX: Ensure the old output file is removed before generating a new one.
         if os.path.exists(OUTPUT_FILENAME):
             os.remove(OUTPUT_FILENAME)
 
-        # CORRECTED API CALL for XTTS model
+        # CORRECTED API CALL: Specify the default built-in speaker for the XTTS model.
         tts.tts_to_file(
             text=text_to_speak,
             file_path=OUTPUT_FILENAME,
-            language='en' 
+            speaker=tts.synthesizer.tts_model.speakers[0],
+            language='en'
         )
 
         if not os.path.exists(OUTPUT_FILENAME):
