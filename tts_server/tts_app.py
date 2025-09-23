@@ -65,4 +65,5 @@ def generate_speech():
 # --- Main Execution ---
 if __name__ == '__main__':
     # Setting host='0.0.0.0' makes it accessible on your local network
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    # Disable debug mode to avoid terminal interaction issues
+    app.run(host='0.0.0.0', port=PORT, debug=False)
