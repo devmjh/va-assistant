@@ -1,17 +1,14 @@
-# Filename: listener_client.py
-# Runs on the Raspberry Pi (ACU) to capture and stream audio.
-
-import os
-import sys
-import time
+# filename: acu_pi/listener_client.py
 import grpc
 import sounddevice as sd
+from pocketsphinx import LiveSpeech
+import webrtcvad
 import numpy as np
-from pocketsphinx import Decoder
-import traceback
+import collections
+import sys
+import os
 
 # --- Add protos directory to path ---
-# This allows us to import our generated gRPC modules
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(PROJECT_ROOT, 'protos'))
 
@@ -19,102 +16,111 @@ import audiostream_pb2
 import audiostream_pb2_grpc
 
 # --- Configuration ---
-# IMPORTANT: Change this to the actual IP address of your Jetson Nano (the "Brain")
-SERVER_ADDRESS = '192.168.4.235:50051' 
+BRAIN_ADDRESS = 'rdunano2:50051' # Using hostname now
+SAMPLE_RATE = 16000
+CHUNK_DURATION_MS = 30  # VAD supports 10, 20, or 30 ms chunks
+CHUNK_SIZE = int(SAMPLE_RATE * CHUNK_DURATION_MS / 1000)
+VAD_AGGRESSIVENESS = 1 # 0 is least aggressive, 3 is most aggressive
+SILENCE_CHUNKS_TRIGGER = 50 # 50 chunks * 30ms = 1.5 seconds of silence
+PRE_SPEECH_BUFFER_CHUNKS = 10 # Buffer 10 * 30ms = 0.3 seconds of audio before speech
+WAKE_WORD = "bridge to engineering"
 
-# Audio Config
-KWS_SAMPLE_RATE = 16000
-INPUT_DEVICE = 'Blue Snowball' # Or your ReSpeaker, once it arrives and is tested
-KEYPHRASE = "bridge to engineering"
-COMMAND_RECORD_SECONDS = 5
-CHUNK_SIZE = 1024
-
-# Path Config
-HOME_DIR = os.path.expanduser('~')
-POCKETSPHINX_MODEL_PATH = os.path.join(HOME_DIR, 'cmusphinx-en-us-ptm-5.2')
-
-# --- gRPC Streaming Function ---
-def stream_audio_to_server(audio_data):
-    print(f"Connecting to server at {SERVER_ADDRESS}...")
+def stream_audio_to_brain(audio_iterator):
+    """Opens a gRPC channel and streams audio chunks from an iterator."""
     try:
-        with grpc.insecure_channel(SERVER_ADDRESS) as channel:
+        with grpc.insecure_channel(BRAIN_ADDRESS) as channel:
             stub = audiostream_pb2_grpc.AudioStreamerStub(channel)
+            print(f"Connecting to server at {BRAIN_ADDRESS}...")
             
-            # Create a generator to stream audio chunks
-            def chunk_generator(data, chunk_size):
-                for i in range(0, len(data), chunk_size):
-                    yield audiostream_pb2.Chunk(audio_chunk=data[i:i+chunk_size])
-
-            # Send the stream and get the server's response
-            response = stub.StreamAudio(chunk_generator(audio_data, CHUNK_SIZE * 2))
+            # The generator function is the audio_iterator itself
+            response = stub.StreamAudio(audio_iterator)
             print(f"Server response: '{response.status_message}'")
-
     except grpc.RpcError as e:
-        print(f"Could not connect to server: {e.details()}")
+        print(f"Could not connect to server or stream failed: {e.status()}")
     except Exception as e:
-        print(f"An error occurred during streaming: {e}")
+        print(f"An unexpected error occurred: {e}")
 
-# --- Main Application Loop ---
+def audio_chunk_generator(stream):
+    """
+    A generator that yields audio chunks for gRPC.
+    Uses VAD to detect speech and silence to know when to stop.
+    """
+    vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
+    
+    # Buffer to hold audio chunks before speech is detected
+    pre_speech_buffer = collections.deque(maxlen=PRE_SPEECH_BUFFER_CHUNKS)
+    
+    triggered = False
+    silence_chunks = 0
+
+    print("✅ Listening for command...")
+    for chunk_np in stream:
+        chunk_bytes = (chunk_np * 32767).astype(np.int16).tobytes()
+
+        # If not yet triggered, fill the pre-speech buffer
+        if not triggered:
+            pre_speech_buffer.append(chunk_bytes)
+        
+        is_speech = vad.is_speech(chunk_bytes, SAMPLE_RATE)
+
+        if is_speech:
+            if not triggered:
+                # Start of speech detected, send the buffered audio first
+                print("Speech detected, streaming...")
+                triggered = True
+                for buffered_chunk in pre_speech_buffer:
+                    yield audiostream_pb2.AudioChunk(audio_chunk=buffered_chunk)
+                pre_speech_buffer.clear()
+
+            # Send the current speech chunk
+            yield audiostream_pb2.AudioChunk(audio_chunk=chunk_bytes)
+            silence_chunks = 0
+        elif triggered:
+            # We are in the middle of a command, send some silence for natural pauses
+            yield audiostream_pb2.AudioChunk(audio_chunk=chunk_bytes)
+            silence_chunks += 1
+            if silence_chunks > SILENCE_CHUNKS_TRIGGER:
+                print("End of command detected.")
+                break # Stop the generator
+    
+    # If the loop finishes without detecting speech, we still need to exit gracefully
+    if not triggered:
+        print("No command heard.")
+
+
 def main():
-    print("Initializing PocketSphinx for wake word detection...")
-    config = Decoder.default_config()
-    config.set_string('-hmm', POCKETSPHINX_MODEL_PATH)
-    config.set_string('-keyphrase', KEYPHRASE)
-    config.set_float('-kws_threshold', 1e-20)
-    config.set_string('-lm', None) 
-    decoder = Decoder(config)
+    """Main loop to listen for wake word and then stream commands."""
+    # Setup LiveSpeech for wake word detection
+    # Note: Using 'keyphrase' is more efficient than a large dictionary for a single phrase.
+    speech = LiveSpeech(
+        verbose=False,
+        sampling_rate=SAMPLE_RATE,
+        buffer_size=CHUNK_SIZE,
+        no_search=False,
+        full_utt=False,
+        keyphrase=WAKE_WORD,
+        kws_threshold=1e-20 # Adjust this threshold for sensitivity
+    )
 
-    # Outer loop to be resilient to errors
+    # Main application loop
     while True:
-        stream = None
-        try:
-            stream = sd.InputStream(device=INPUT_DEVICE, samplerate=KWS_SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE)
+        print(f"✅ ACU is running. Waiting for '{WAKE_WORD}'...")
+        for phrase in speech:
+            # Wake word detected
+            print(f"✅ Wake word detected!")
             
-            print(f"\n✅ ACU is running. Waiting for '{KEYPHRASE}'...")
-            stream.start()
-            decoder.start_utt()
+            # Open a new stream for command capture
+            with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='float32', blocksize=CHUNK_SIZE) as stream:
+                # Create the generator for this specific command
+                audio_iterator = audio_chunk_generator(stream)
+                # Stream the command to the brain
+                stream_audio_to_brain(audio_iterator)
             
-            command_frames = []
-            
-            # Inner loop for active listening
-            while True:
-                buf, overflowed = stream.read(CHUNK_SIZE)
-                decoder.process_raw(buf.ravel().tobytes(), False, False)
-                
-                # If wake word is detected, start capturing the command audio
-                if decoder.hyp() is not None:
-                    print(f"✅ Wake word detected! Recording command for {COMMAND_RECORD_SECONDS} seconds...")
-                    
-                    # Record the command audio for the specified duration
-                    num_chunks_for_command = int((COMMAND_RECORD_SECONDS * KWS_SAMPLE_RATE) / CHUNK_SIZE)
-                    for _ in range(num_chunks_for_command):
-                        buf, overflowed = stream.read(CHUNK_SIZE)
-                        command_frames.append(buf)
-                    
-                    # Command is recorded, break the inner loop to process it
-                    break
-            
-            # Stop and close the stream to be clean
-            stream.stop()
-            stream.close()
-            
-            # Concatenate all the audio frames and stream them to the server
-            command_audio = np.concatenate(command_frames)
-            stream_audio_to_server(command_audio.tobytes())
-            
-            # Reset the decoder for the next wake word
-            decoder.end_utt()
-
-        except KeyboardInterrupt:
-            print("\nStopping ACU.")
-            break # Exit the main while loop
-        except Exception as e:
-            print(f"An error occurred in the listener loop:")
-            traceback.print_exc()
-            time.sleep(5)
-        finally:
-            if stream and not stream.closed:
-                stream.close()
+            # Break to restart the LiveSpeech loop for the next wake word
+            break
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nExiting.")

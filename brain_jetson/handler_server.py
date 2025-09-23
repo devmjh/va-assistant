@@ -220,31 +220,42 @@ def api_query(transcript):
 class AudioStreamerServicer(audiostream_pb2_grpc.AudioStreamerServicer):
     def StreamAudio(self, request_iterator, context):
         print("\nConnection received from an ACU...")
-        audio_data = bytearray()
+        
+        # 1. Set up the streaming transcriber
+        rec = KaldiRecognizer(vosk_model, SAMPLE_RATE)
+        
+        # 2. Process audio chunks from the stream
         for chunk in request_iterator:
-            audio_data.extend(chunk.audio_chunk)
-        print(f"Received {len(audio_data)} bytes of audio data.")
+            if rec.AcceptWaveform(chunk.audio_chunk):
+                # This block is for partial results, which we are ignoring for now
+                pass
+
+        # 3. Get the final transcription after the stream is closed
+        result = json.loads(rec.FinalResult())
+        transcript = result.get('text', '')
         
-        speak("Acknowledged.")
-        
-        transcript = transcribe_audio_bytes(bytes(audio_data))
+        # --- The rest of the logic remains the same ---
+
+        # We are using a pre-generated file for this now for speed
+        subprocess.run(["aplay", os.path.join(os.path.dirname(__file__), "acknowledged.wav")], check=True, 
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         if transcript:
             print(f"Heard command: '{transcript}'")
             # --- The full intent parser ---
             if "add" in transcript.lower() and "inventory" in transcript.lower():
-                result = add_to_inventory(transcript)
+                response = add_to_inventory(transcript)
             elif "inventory" in transcript.lower():
-                result = local_data_query(transcript)
+                response = local_data_query(transcript)
             elif "temperature" in transcript.lower():
-                result = get_cpu_temperature()
+                response = get_cpu_temperature()
             elif any(kw in transcript.lower() for kw in ["who are you", "what can you do"]):
-                result = local_query(transcript)
+                response = local_query(transcript)
             else:
-                result = api_query(transcript)
+                response = api_query(transcript)
             
-            print(f"Response: {result}")
-            speak(result)
+            print(f"Response: {response}")
+            speak(response)
         else:
             speak("I didn't catch that.")
         

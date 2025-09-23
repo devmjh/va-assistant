@@ -1,20 +1,19 @@
-// Use protobuf version 3 syntax
+// filename: protos/audiostream.proto
 syntax = "proto3";
 
-// The message format for a single chunk of audio data
-message Chunk {
+// Defines the structure of a single chunk of audio data
+message AudioChunk {
   bytes audio_chunk = 1;
 }
 
-// The message format for the server's response after the stream is complete
+// Defines the structure of the server's receipt message
 message StreamReceipt {
   string status_message = 1;
 }
 
-// The definition of our AudioStreamer service
+// The gRPC service definition
 service AudioStreamer {
-  // A client-streaming RPC.
-  // The client (Raspberry Pi) sends a stream of audio Chunks.
-  // The server (Jetson) sends back a single StreamReceipt when it's done.
-  rpc StreamAudio(stream Chunk) returns (StreamReceipt) {}
+  // A client-streaming RPC. The client sends a stream of AudioChunk messages.
+  // The server responds with a single StreamReceipt when the client is done.
+  rpc StreamAudio (stream AudioChunk) returns (StreamReceipt) {}
 }

@@ -26,7 +26,7 @@ if _version_not_supported:
 
 
 class AudioStreamerStub(object):
-    """The definition of our AudioStreamer service
+    """The gRPC service definition
     """
 
     def __init__(self, channel):
@@ -37,19 +37,18 @@ class AudioStreamerStub(object):
         """
         self.StreamAudio = channel.stream_unary(
                 '/AudioStreamer/StreamAudio',
-                request_serializer=audiostream__pb2.Chunk.SerializeToString,
+                request_serializer=audiostream__pb2.AudioChunk.SerializeToString,
                 response_deserializer=audiostream__pb2.StreamReceipt.FromString,
                 _registered_method=True)
 
 
 class AudioStreamerServicer(object):
-    """The definition of our AudioStreamer service
+    """The gRPC service definition
     """
 
     def StreamAudio(self, request_iterator, context):
-        """A client-streaming RPC.
-        The client (Raspberry Pi) sends a stream of audio Chunks.
-        The server (Jetson) sends back a single StreamReceipt when it's done.
+        """A client-streaming RPC. The client sends a stream of AudioChunk messages.
+        The server responds with a single StreamReceipt when the client is done.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -60,7 +59,7 @@ def add_AudioStreamerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'StreamAudio': grpc.stream_unary_rpc_method_handler(
                     servicer.StreamAudio,
-                    request_deserializer=audiostream__pb2.Chunk.FromString,
+                    request_deserializer=audiostream__pb2.AudioChunk.FromString,
                     response_serializer=audiostream__pb2.StreamReceipt.SerializeToString,
             ),
     }
@@ -72,7 +71,7 @@ def add_AudioStreamerServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class AudioStreamer(object):
-    """The definition of our AudioStreamer service
+    """The gRPC service definition
     """
 
     @staticmethod
@@ -90,7 +89,7 @@ class AudioStreamer(object):
             request_iterator,
             target,
             '/AudioStreamer/StreamAudio',
-            audiostream__pb2.Chunk.SerializeToString,
+            audiostream__pb2.AudioChunk.SerializeToString,
             audiostream__pb2.StreamReceipt.FromString,
             options,
             channel_credentials,

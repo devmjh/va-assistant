@@ -24,17 +24,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x61udiostream.proto\"\x1c\n\x05\x43hunk\x12\x13\n\x0b\x61udio_chunk\x18\x01 \x01(\x0c\"\'\n\rStreamReceipt\x12\x16\n\x0estatus_message\x18\x01 \x01(\t2:\n\rAudioStreamer\x12)\n\x0bStreamAudio\x12\x06.Chunk\x1a\x0e.StreamReceipt\"\x00(\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11\x61udiostream.proto\"!\n\nAudioChunk\x12\x13\n\x0b\x61udio_chunk\x18\x01 \x01(\x0c\"\'\n\rStreamReceipt\x12\x16\n\x0estatus_message\x18\x01 \x01(\t2?\n\rAudioStreamer\x12.\n\x0bStreamAudio\x12\x0b.AudioChunk\x1a\x0e.StreamReceipt\"\x00(\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'audiostream_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_CHUNK']._serialized_start=21
-  _globals['_CHUNK']._serialized_end=49
-  _globals['_STREAMRECEIPT']._serialized_start=51
-  _globals['_STREAMRECEIPT']._serialized_end=90
-  _globals['_AUDIOSTREAMER']._serialized_start=92
-  _globals['_AUDIOSTREAMER']._serialized_end=150
+  _globals['_AUDIOCHUNK']._serialized_start=21
+  _globals['_AUDIOCHUNK']._serialized_end=54
+  _globals['_STREAMRECEIPT']._serialized_start=56
+  _globals['_STREAMRECEIPT']._serialized_end=95
+  _globals['_AUDIOSTREAMER']._serialized_start=97
+  _globals['_AUDIOSTREAMER']._serialized_end=160
 # @@protoc_insertion_point(module_scope)
