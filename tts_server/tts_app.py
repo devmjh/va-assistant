@@ -6,6 +6,7 @@ import torch
 import logging
 
 # Set up basic logging
+# logging is cool test comment
 logging.basicConfig(level=logging.INFO)
 
 # --- Server Setup ---
@@ -21,11 +22,13 @@ logging.info(f"TTS running on device: {device}")
 # Load a high-quality TTS model
 model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
 logging.info(f"Loading TTS model: {model_name}...")
+
+# Initialize TTS with the example speaker reference file
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
 
-# Get the default speaker wav from the samples
-speaker_wav = tts.synthesizer.tts_model.speaker_manager.speaker_paths[0]
-logging.info(f"Using speaker reference: {speaker_wav}")
+# Get path to the example audio file that comes with TTS
+example_audio = tts.synthesizer.tts_model.config.speaker_wav
+logging.info(f"Using speaker reference: {example_audio}")
 logging.info("TTS model loaded successfully.")
 
 
@@ -47,7 +50,7 @@ def generate_speech():
 
     try:
         # Generate speech and save to a file
-        tts.tts_to_file(text=text_to_speak, file_path=OUTPUT_FILENAME, speaker_wav=speaker_wav, language="en")
+        tts.tts_to_file(text=text_to_speak, file_path=OUTPUT_FILENAME, speaker_wav=example_audio, language="en")
 
         # Check if the file was created
         if not os.path.exists(OUTPUT_FILENAME):
