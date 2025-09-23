@@ -36,7 +36,7 @@ def stream_audio_to_brain(audio_iterator):
             response = stub.StreamAudio(audio_iterator)
             print(f"Server response: '{response.status_message}'")
     except grpc.RpcError as e:
-        print(f"Could not connect to server or stream failed: {e.status()}")
+        print(f"Could not connect to server or stream failed: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
