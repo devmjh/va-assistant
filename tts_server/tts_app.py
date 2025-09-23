@@ -14,7 +14,8 @@ OUTPUT_FILENAME = "output.wav"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info(f"TTS running on device: {device}")
 
-model_name = "tts_models/en/ljspeech/tacotron2-DDC"
+# Upgraded to the high-quality XTTS v2 model
+model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
 logging.info(f"Loading TTS model: {model_name}...")
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
 logging.info("TTS model loaded successfully.")
@@ -29,7 +30,18 @@ def generate_speech():
     logging.info(f"Received request to synthesize: '{text_to_speak}'")
 
     try:
-        tts.tts_to_file(text=text_to_speak, file_path=OUTPUT_FILENAME)
+        # BUG FIX: Ensure the old output file is removed before generating a new one.
+        if os.path.exists(OUTPUT_FILENAME):
+            os.remove(OUTPUT_FILENAME)
+
+        # XTTS requires a speaker wav file. We can use the model's default synthesizer.
+        # This is a simplified call; more advanced uses can specify different speaker voices.
+        tts.tts_to_file(
+            text=text_to_speak,
+            file_path=OUTPUT_FILENAME,
+            speaker=tts.speakers[0],
+            language=tts.languages[0]
+        )
 
         if not os.path.exists(OUTPUT_FILENAME):
             return jsonify({"error": "TTS failed to generate audio file"}), 500
