@@ -23,21 +23,23 @@ logging.info(f"TTS running on device: {device}")
 model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
 logging.info(f"Loading TTS model: {model_name}...")
 
+# Initialize TTS with specific speaker
+model_path = os.path.dirname(os.path.abspath(__file__))
+speaker_wav = os.path.join(model_path, "speaker_ref.wav")
+
+# Create a dummy speaker reference file if it doesn't exist
+if not os.path.exists(speaker_wav):
+    logging.info("Creating initial speaker reference file...")
+    import numpy as np
+    import soundfile as sf
+    # Create 1 second of silence as reference
+    sample_rate = 22050
+    silence = np.zeros(sample_rate)
+    sf.write(speaker_wav, silence, sample_rate)
+    logging.info(f"Created speaker reference at: {speaker_wav}")
+
 # Initialize TTS
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
-
-# Create a short reference text for initial synthesis
-reference_text = "This is a reference voice for text to speech synthesis."
-reference_audio_path = os.path.join(os.path.dirname(__file__), "reference_voice.wav")
-
-# Generate reference audio if it doesn't exist
-if not os.path.exists(reference_audio_path):
-    logging.info("Generating reference voice file...")
-    tts.tts_to_file(text=reference_text, file_path=reference_audio_path, language="en")
-    logging.info(f"Reference voice file created at: {reference_audio_path}")
-else:
-    logging.info(f"Using existing reference voice file: {reference_audio_path}")
-
 logging.info("TTS model loaded successfully.")
 
 
@@ -64,10 +66,10 @@ def generate_speech():
             return jsonify({"error": "Text cannot be empty"}), 400
 
         logging.info(f"Attempting to synthesize: '{text_to_speak}'")
-        logging.info(f"Using reference audio: {example_audio}")
+        logging.info(f"Using reference audio: {speaker_wav}")
 
         # Generate speech and save to a file
-        tts.tts_to_file(text=text_to_speak, file_path=OUTPUT_FILENAME, speaker_wav=example_audio, language="en")
+        tts.tts_to_file(text=text_to_speak, file_path=OUTPUT_FILENAME, speaker_wav=speaker_wav, language="en")
 
         # Check if the file was created and log its details
         if not os.path.exists(OUTPUT_FILENAME):
