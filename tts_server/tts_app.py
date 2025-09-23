@@ -20,6 +20,16 @@ logging.info(f"Loading TTS model: {model_name}...")
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
 logging.info("TTS model loaded successfully.")
 
+# Create a reference text for the default voice
+reference_text = "This is a sample text for voice reference."
+reference_audio_path = "reference_voice.wav"
+
+# Generate reference audio if it doesn't exist
+if not os.path.exists(reference_audio_path):
+    logging.info("Generating reference audio...")
+    tts.tts_to_file(text=reference_text, file_path=reference_audio_path, language="en")
+    logging.info("Reference audio generated successfully.")
+
 @app.route('/api/tts', methods=['POST'])
 def generate_speech():
     data = request.get_json()
@@ -33,10 +43,11 @@ def generate_speech():
         if os.path.exists(OUTPUT_FILENAME):
             os.remove(OUTPUT_FILENAME)
 
-        # Generate speech using XTTS v2
+        # Generate speech using XTTS v2 with reference audio
         tts.tts_to_file(
             text=text_to_speak,
             file_path=OUTPUT_FILENAME,
+            speaker_wav=reference_audio_path,
             language='en'
         )
 
