@@ -1,12 +1,13 @@
+# AI Models
+vosk-model-small-en-us-0.15/
+*.zip
+
 # Python
+va_env/
 __pycache__/
 *.pyc
 
-# Virtual Environment
-va_env/
-riva_venv/
-
-# Secrets
+# Environment files
 .env
 
 # Temporary Media Files

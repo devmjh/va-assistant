@@ -1,4 +1,4 @@
-# Filename: handler_server.py
+# Filename: brain_jetson/handler_server.py
 # FINAL STABLE VERSION: Includes correct MySQL query and a timeout for the API call.
 
 import os
@@ -9,7 +9,7 @@ import traceback
 from dotenv import load_dotenv
 from concurrent import futures
 import subprocess
-
+import requests
 import sounddevice as sd
 import numpy as np
 import ollama
@@ -17,7 +17,6 @@ from openai import OpenAI, Timeout
 import mysql.connector
 
 from vosk import Model, KaldiRecognizer
-import pyttsx3
 import grpc
 
 # --- Add protos directory to path ---
@@ -39,28 +38,46 @@ if not api_key: raise ValueError("OPENAI_API_KEY not found in .env")
 if not all([mysql_host, mysql_user, mysql_password, mysql_db]): raise ValueError("MySQL credentials not found in .env")
 
 SAMPLE_RATE = 16000
-OUTPUT_DEVICE = 'C-Media USB Audio Device'
 HOME_DIR = os.path.expanduser('~')
 VOSK_MODEL_PATH = os.path.join(HOME_DIR, 'va-assistant/vosk-model-small-en-us-0.15')
 LOCAL_LLM_MODEL = "phi3:mini"
 conversation_history = []
 
 # --- Component Initialization ---
-# Set a timeout for the OpenAI client
 client = OpenAI(api_key=api_key, timeout=20.0)
 mysql_conn = None
 mysql_cursor = None
-tts_engine = pyttsx3.init()
 vosk_model = None
 
 # --- Core AI and Skill Functions ---
 def speak(text):
+    """
+    Sends text to the dedicated TTS server, saves the returned audio,
+    and plays it using aplay.
+    """
     print(f"TTS: {text}")
+    tts_server_url = "http://192.168.4.225:5002/api/tts"
+    local_audio_file = "response.wav"
+
     try:
-        tts_engine.say(text)
-        tts_engine.runAndWait()
+        payload = {'text': text}
+        response = requests.post(tts_server_url, json=payload, timeout=20.0)
+
+        if response.status_code == 200:
+            with open(local_audio_file, 'wb') as f:
+                f.write(response.content)
+            print("--- Playing audio file now... ---")
+            subprocess.run(["aplay", local_audio_file], check=True, 
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("--- Finished playing audio. ---")
+            os.remove(local_audio_file)
+        else:
+            print(f"Error from TTS Server: {response.status_code} - {response.text}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Could not connect to TTS server: {e}")
     except Exception as e:
-        print(f"An error occurred during TTS: {e}")
+        print(f"An error occurred in the speak function: {e}")
 
 def transcribe_audio_bytes(command_bytes):
     print("Processing command...")
@@ -98,11 +115,9 @@ def local_data_query(transcript):
         item_name = parts[1].strip() if len(parts) > 1 else "all"
         try:
             if item_name == "all":
-                # Use the correct column name 'item'
                 query = "SELECT item, quantity FROM lab_inventory"
                 mysql_cursor.execute(query)
             else:
-                # Use the correct column name 'item'
                 query = "SELECT item, quantity FROM lab_inventory WHERE item LIKE %s"
                 mysql_cursor.execute(query, (f"%{item_name}%",))
             results = mysql_cursor.fetchall()
@@ -116,6 +131,41 @@ def local_data_query(transcript):
             print(f"A database error occurred: {e}")
             return "Sorry, I had a problem querying the database."
     return "No local data query matched."
+
+def add_to_inventory(transcript):
+    """Parses a command to add an item to the inventory and updates the database."""
+    try:
+        words = transcript.lower().split()
+        add_index = words.index("add")
+        to_index = words.index("to")
+        
+        num_map = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, 
+                   "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+        
+        quantity_word = words[add_index + 1]
+        quantity = num_map.get(quantity_word, int(quantity_word) if quantity_word.isdigit() else 1)
+        
+        item_name = " ".join(words[add_index + 2 : to_index])
+        
+        if not item_name:
+            return "I didn't catch the item name. Please try again."
+
+        query = """
+            INSERT INTO lab_inventory (item, quantity) 
+            VALUES (%s, %s) 
+            ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)
+        """
+        mysql_cursor.execute(query, (item_name, quantity))
+        mysql_conn.commit()
+        
+        plural = "s" if quantity > 1 else ""
+        return f"Okay, I've added {quantity} {item_name}{plural} to the inventory."
+
+    except (ValueError, IndexError):
+        return "I didn't understand the format. Please say something like 'add one item to the inventory'."
+    except Exception as e:
+        print(f"A database error occurred during insert: {e}")
+        return "Sorry, I had a problem updating the database."
 
 def api_query(transcript):
     try:
@@ -147,8 +197,10 @@ class AudioStreamerServicer(audiostream_pb2_grpc.AudioStreamerServicer):
         
         if transcript:
             print(f"Heard command: '{transcript}'")
-            # The full intent parser
-            if "inventory" in transcript.lower():
+            # --- The full intent parser ---
+            if "add" in transcript.lower() and "inventory" in transcript.lower():
+                result = add_to_inventory(transcript)
+            elif "inventory" in transcript.lower():
                 result = local_data_query(transcript)
             elif "temperature" in transcript.lower():
                 result = get_cpu_temperature()
