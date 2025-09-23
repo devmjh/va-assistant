@@ -34,13 +34,11 @@ def generate_speech():
         if os.path.exists(OUTPUT_FILENAME):
             os.remove(OUTPUT_FILENAME)
 
-        # XTTS requires a speaker wav file. We can use the model's default synthesizer.
-        # This is a simplified call; more advanced uses can specify different speaker voices.
+        # CORRECTED API CALL for XTTS model
         tts.tts_to_file(
             text=text_to_speak,
             file_path=OUTPUT_FILENAME,
-            speaker=tts.speakers[0],
-            language=tts.languages[0]
+            language='en' 
         )
 
         if not os.path.exists(OUTPUT_FILENAME):
@@ -54,6 +52,7 @@ def generate_speech():
         )
     except Exception as e:
         logging.error(f"An error occurred during TTS synthesis: {e}")
+        traceback.print_exc()
         return jsonify({"error": "An internal server error occurred"}), 500
 
 if __name__ == '__main__':
