@@ -33,11 +33,10 @@ def generate_speech():
         if os.path.exists(OUTPUT_FILENAME):
             os.remove(OUTPUT_FILENAME)
 
-        # CORRECTED API CALL: Specify the default built-in speaker for the XTTS model.
+        # Generate speech using XTTS v2
         tts.tts_to_file(
             text=text_to_speak,
             file_path=OUTPUT_FILENAME,
-            speaker=tts.synthesizer.tts_model.speakers[0],
             language='en'
         )
 
