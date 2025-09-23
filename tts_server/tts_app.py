@@ -66,7 +66,7 @@ if not os.path.exists(speaker_wav):
         raise
 
 # Initialize TTS with trust_remote_code=True to address GPT warning
-tts = TTS(model_name=model_name, progress_bar=False, trust_remote_code=True).to(device)
+tts = TTS(model_name=model_name, progress_bar=False).to(device)
 logging.info("TTS model loaded successfully.")
 
 
