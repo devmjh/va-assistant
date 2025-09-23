@@ -55,29 +55,63 @@ def speak(text):
     Sends text to the dedicated TTS server, saves the returned audio,
     and plays it using aplay.
     """
-    print(f"TTS: {text}")
+    print("\n=== Starting TTS Request ===")
+    print(f"TTS Text: {text}")
     tts_server_url = "http://192.168.4.225:5002/api/tts"
     local_audio_file = "response.wav"
-
+    
     try:
+        print(f"Sending request to TTS server at {tts_server_url}")
         payload = {'text': text}
+        print(f"Request payload: {payload}")
+        
         response = requests.post(tts_server_url, json=payload, timeout=20.0)
+        print(f"Received response: Status {response.status_code}")
+        print(f"Response headers: {dict(response.headers)}")
+        print(f"Response content length: {len(response.content)} bytes")
+        print(f"Content type: {response.headers.get('content-type', 'Not specified')}")
 
         if response.status_code == 200:
+            print(f"Writing audio data to {local_audio_file}")
             with open(local_audio_file, 'wb') as f:
                 f.write(response.content)
-            print("--- Playing audio file now... ---")
-            subprocess.run(["aplay", local_audio_file], check=True, 
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("--- Finished playing audio. ---")
-            os.remove(local_audio_file)
+            
+            if os.path.exists(local_audio_file):
+                file_size = os.path.getsize(local_audio_file)
+                print(f"Audio file created successfully. Size: {file_size} bytes")
+                
+                print("--- Playing audio file now... ---")
+                try:
+                    result = subprocess.run(["aplay", "-v", local_audio_file], 
+                                         capture_output=True, text=True)
+                    print(f"aplay stdout: {result.stdout}")
+                    print(f"aplay stderr: {result.stderr}")
+                    if result.returncode != 0:
+                        print(f"aplay returned non-zero exit code: {result.returncode}")
+                except subprocess.SubprocessError as e:
+                    print(f"Error running aplay: {e}")
+                
+                print("--- Finished playing audio ---")
+                os.remove(local_audio_file)
+                print(f"Removed temporary audio file: {local_audio_file}")
+            else:
+                print(f"ERROR: Audio file {local_audio_file} was not created!")
         else:
-            print(f"Error from TTS Server: {response.status_code} - {response.text}")
+            print(f"Error from TTS Server: {response.status_code}")
+            print(f"Error details: {response.text}")
+            try:
+                print(f"Full response content: {response.content.decode('utf-8')}")
+            except:
+                print(f"Raw response content: {response.content}")
 
     except requests.exceptions.RequestException as e:
         print(f"Could not connect to TTS server: {e}")
+        print(f"Request exception details: {traceback.format_exc()}")
     except Exception as e:
         print(f"An error occurred in the speak function: {e}")
+        print(f"Exception details: {traceback.format_exc()}")
+    
+    print("=== TTS Request Complete ===\n")
 
 def transcribe_audio_bytes(command_bytes):
     print("Processing command...")

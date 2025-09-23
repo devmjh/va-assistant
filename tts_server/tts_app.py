@@ -23,12 +23,21 @@ logging.info(f"TTS running on device: {device}")
 model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
 logging.info(f"Loading TTS model: {model_name}...")
 
-# Initialize TTS with the example speaker reference file
+# Initialize TTS
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
 
-# Get path to the example audio file that comes with TTS
-example_audio = tts.synthesizer.tts_model.config.speaker_wav
-logging.info(f"Using speaker reference: {example_audio}")
+# Create a short reference text for initial synthesis
+reference_text = "This is a reference voice for text to speech synthesis."
+reference_audio_path = os.path.join(os.path.dirname(__file__), "reference_voice.wav")
+
+# Generate reference audio if it doesn't exist
+if not os.path.exists(reference_audio_path):
+    logging.info("Generating reference voice file...")
+    tts.tts_to_file(text=reference_text, file_path=reference_audio_path, language="en")
+    logging.info(f"Reference voice file created at: {reference_audio_path}")
+else:
+    logging.info(f"Using existing reference voice file: {reference_audio_path}")
+
 logging.info("TTS model loaded successfully.")
 
 
@@ -38,36 +47,53 @@ def generate_speech():
     """
     Receives text in a JSON payload and returns a WAV audio file.
     """
-    data = request.get_json()
-    if not data or 'text' not in data:
-        return jsonify({"error": "No text provided"}), 400
-
-    text_to_speak = data['text']
-    if not text_to_speak.strip():
-        return jsonify({"error": "Text cannot be empty"}), 400
-
-    logging.info(f"Received request to synthesize: '{text_to_speak}'")
-
+    logging.info("=== New TTS Request ===")
+    logging.info(f"Request from: {request.remote_addr}")
+    
     try:
+        data = request.get_json()
+        logging.info(f"Received JSON data: {data}")
+        
+        if not data or 'text' not in data:
+            logging.error("No text provided in request")
+            return jsonify({"error": "No text provided"}), 400
+
+        text_to_speak = data['text']
+        if not text_to_speak.strip():
+            logging.error("Empty text provided")
+            return jsonify({"error": "Text cannot be empty"}), 400
+
+        logging.info(f"Attempting to synthesize: '{text_to_speak}'")
+        logging.info(f"Using reference audio: {example_audio}")
+
         # Generate speech and save to a file
         tts.tts_to_file(text=text_to_speak, file_path=OUTPUT_FILENAME, speaker_wav=example_audio, language="en")
 
-        # Check if the file was created
+        # Check if the file was created and log its details
         if not os.path.exists(OUTPUT_FILENAME):
+            logging.error(f"File {OUTPUT_FILENAME} was not created")
             return jsonify({"error": "TTS failed to generate audio file"}), 500
         
-        logging.info(f"Successfully generated audio file: {OUTPUT_FILENAME}")
+        file_size = os.path.getsize(OUTPUT_FILENAME)
+        logging.info(f"Successfully generated audio file: {OUTPUT_FILENAME} (Size: {file_size} bytes)")
 
         # Send the audio file back to the client
-        return send_file(
+        logging.info("Sending audio file response...")
+        response = send_file(
             OUTPUT_FILENAME,
             mimetype="audio/wav",
             as_attachment=True,
             download_name="response.wav"
         )
+        
+        logging.info(f"Response headers: {dict(response.headers)}")
+        logging.info("=== Request Complete ===")
+        return response
+        
     except Exception as e:
-        logging.error(f"An error occurred during TTS synthesis: {e}")
-        return jsonify({"error": "An internal server error occurred"}), 500
+        logging.error(f"An error occurred during TTS synthesis: {str(e)}")
+        logging.error(f"Exception details: {traceback.format_exc()}")
+        return jsonify({"error": "An internal server error occurred", "details": str(e)}), 500
 
 # --- Main Execution ---
 if __name__ == '__main__':
