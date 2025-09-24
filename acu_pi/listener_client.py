@@ -35,7 +35,7 @@ def main():
         hmm='/usr/share/pocketsphinx/model/en-us/en-us',
         dict='/usr/share/pocketsphinx/model/en-us/cmudict-en-us.dict',
         keyphrase=WAKE_WORD,
-        kws_threshold=1e-45,
+        kws_threshold=1e-80,
         logfn='/dev/null'
     )
     decoder = Decoder(config)
