@@ -19,13 +19,6 @@ logging.info(f"Loading TTS model: {model_name}...")
 tts = TTS(model_name=model_name, progress_bar=False).to(device)
 logging.info("TTS model loaded successfully.")
 
-# Get the list of available speakers from the model
-available_speakers = tts.synthesizer.speaker_manager.speaker_names
-# Select the first available speaker as our default voice
-default_speaker = available_speakers[0]
-logging.info(f"Default speaker set to: {default_speaker}")
-
-
 @app.route('/api/tts', methods=['POST'])
 def generate_speech():
     data = request.get_json()
@@ -39,11 +32,11 @@ def generate_speech():
         if os.path.exists(OUTPUT_FILENAME):
             os.remove(OUTPUT_FILENAME)
 
-        # CORRECTED API CALL for XTTS model using the default speaker
+        # CORRECTED API CALL: Using the 'tts_speakers' attribute discovered from our debug script.
         tts.tts_to_file(
             text=text_to_speak,
             file_path=OUTPUT_FILENAME,
-            speaker=default_speaker,
+            speaker=tts.synthesizer.tts_speakers[0],
             language='en'
         )
 
