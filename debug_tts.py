@@ -19,12 +19,14 @@ try:
         print(f"Type: {type(tts.synthesizer)}")
         print(f"Attributes: {dir(tts.synthesizer)}")
 
-        print("\n--- Inspecting the 'tts.synthesizer.tts_model' object ---")
-        if hasattr(tts.synthesizer, 'tts_model'):
-            print(f"Type: {type(tts.synthesizer.tts_model)}")
-            print(f"Attributes: {dir(tts.synthesizer.tts_model)}")
+        # ADDED DETAIL: Check for speaker_manager
+        print("\n--- Inspecting the 'tts.synthesizer.speaker_manager' object ---")
+        if hasattr(tts.synthesizer, 'speaker_manager'):
+             print(f"Type: {type(tts.synthesizer.speaker_manager)}")
+             print(f"Attributes: {dir(tts.synthesizer.speaker_manager)}")
         else:
-            print("'tts.synthesizer' has no 'tts_model' attribute.")
+            print("'tts.synthesizer' has no 'speaker_manager' attribute.")
+
     else:
         print("'tts' object has no 'synthesizer' attribute.")
 
