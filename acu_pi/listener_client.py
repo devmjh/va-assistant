@@ -1,7 +1,7 @@
 # filename: acu_pi/listener_client.py
 import grpc
 import sounddevice as sd
-from pocketsphinx import Decoder
+from pocketsphinx import Config, Decoder
 import webrtcvad
 import numpy as np
 import collections
@@ -34,12 +34,13 @@ def main():
     # This setup creates a clean configuration for only keyword spotting
     # and finds the model path automatically.
     model_path = pocketsphinx.get_model_path()
-    config = Decoder.Config()
-    config.set_string('-hmm', os.path.join(model_path, 'en-us'))
-    config.set_string('-dict', os.path.join(model_path, 'cmudict-en-us.dict'))
-    config.set_string('-keyphrase', WAKE_WORD)
-    config.set_float('-kws_threshold', 1e-20)
-    config.set_string('-logfn', '/dev/null') # Suppress log file spam
+    config = Config(
+        hmm=os.path.join(model_path, 'en-us'),
+        dict=os.path.join(model_path, 'cmudict-en-us.dict'),
+        keyphrase=WAKE_WORD,
+        kws_threshold=1e-20,
+        logfn='/dev/null' # Suppress log file spam
+    )
     decoder = Decoder(config)
 
     # --- Initialize VAD ---
