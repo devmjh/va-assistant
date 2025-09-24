@@ -7,7 +7,6 @@ import numpy as np
 import collections
 import sys
 import os
-import pocketsphinx
 
 # --- Add protos directory to path ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -31,15 +30,13 @@ def main():
        to switch between wake-word detection and command streaming."""
     
     # --- Initialize PocketSphinx Decoder ---
-    # This setup creates a clean configuration for only keyword spotting
-    # and finds the model path automatically.
-    model_path = pocketsphinx.get_model_path()
+    # This configuration points to the stable model path installed by apt.
     config = Config(
-        hmm=os.path.join(model_path, 'en-us'),
-        dict=os.path.join(model_path, 'cmudict-en-us.dict'),
+        hmm='/usr/share/pocketsphinx/model/en-us/en-us',
+        dict='/usr/share/pocketsphinx/model/en-us/cmudict-en-us.dict',
         keyphrase=WAKE_WORD,
         kws_threshold=1e-20,
-        logfn='/dev/null' # Suppress log file spam
+        logfn='/dev/null'
     )
     decoder = Decoder(config)
 
